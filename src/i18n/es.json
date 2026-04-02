@@ -1,0 +1,11 @@
+{
+  "appName": "MangoCut",
+  "welcome": "Bienvenido a MangoCut",
+  "newProject": "Nuevo proyecto",
+  "editor": "Editor",
+  "settings": "Ajustes",
+  "language": "Idioma",
+  "theme": "Tema",
+  "light": "Claro",
+  "dark": "Oscuro"
+}
