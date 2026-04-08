@@ -966,42 +966,6 @@ export default function EditorScreen({ navigation, route }) {
           )}
         </View>
 
-        <View style={[styles.mediaBin, { borderColor: skin.panelBorder }]}>
-          <Text style={styles.trackLabel}>BANDEJA MEDIA ({clips.length})</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.mediaBinRow}
-          >
-            {clips.length === 0 ? (
-              <Text style={styles.mediaBinEmpty}>Añade varios clips para verlos aquí</Text>
-            ) : (
-              clips.map((clip, idx) => (
-                <TouchableOpacity
-                  key={clip.id}
-                  style={[
-                    styles.mediaBinItem,
-                    idx === selectedIndex && styles.mediaBinItemActive,
-                  ]}
-                  onPress={() => {
-                    setSelectedIndex(idx);
-                    setCurrentIndex(idx);
-                  }}
-                >
-                  {clip.type === "image" ? (
-                    <Image source={{ uri: clip.uri }} style={styles.mediaBinThumb} />
-                  ) : (
-                    <View style={styles.mediaBinVideo}>
-                      <Text style={styles.mediaBinVideoText}>VIDEO</Text>
-                    </View>
-                  )}
-                  <Text style={styles.mediaBinLabel}>Clip {idx + 1}</Text>
-                </TouchableOpacity>
-              ))
-            )}
-          </ScrollView>
-        </View>
-
         <TouchableOpacity
           style={styles.audioAccordionHead}
           onPress={() => setAudioAccordionOpen((v) => !v)}
@@ -1088,6 +1052,42 @@ export default function EditorScreen({ navigation, route }) {
           <View style={styles.audioTrackBlock}>
             <AudioWave active={!!audioTrack} />
           </View>
+        </View>
+
+        <View style={[styles.mediaBin, { borderColor: skin.panelBorder }]}>
+          <Text style={styles.trackLabel}>BANDEJA MEDIA ({clips.length})</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.mediaBinRow}
+          >
+            {clips.length === 0 ? (
+              <Text style={styles.mediaBinEmpty}>Añade varios clips para verlos aquí</Text>
+            ) : (
+              clips.map((clip, idx) => (
+                <TouchableOpacity
+                  key={clip.id}
+                  style={[
+                    styles.mediaBinItem,
+                    idx === selectedIndex && styles.mediaBinItemActive,
+                  ]}
+                  onPress={() => {
+                    setSelectedIndex(idx);
+                    setCurrentIndex(idx);
+                  }}
+                >
+                  {clip.type === "image" ? (
+                    <Image source={{ uri: clip.uri }} style={styles.mediaBinThumb} />
+                  ) : (
+                    <View style={styles.mediaBinVideo}>
+                      <Text style={styles.mediaBinVideoText}>VIDEO</Text>
+                    </View>
+                  )}
+                  <Text style={styles.mediaBinLabel}>Clip {idx + 1}</Text>
+                </TouchableOpacity>
+              ))
+            )}
+          </ScrollView>
         </View>
         </ScrollView>
       </View>
@@ -1485,12 +1485,12 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
   mediaBin: {
-    marginTop: 6,
+    marginTop: 4,
     backgroundColor: "rgba(8,18,36,0.72)",
     borderRadius: 12,
     borderWidth: 1,
     borderColor: "#1B2B4A",
-    padding: 6,
+    padding: 5,
   },
   mediaBinRow: {
     gap: 8,
@@ -1585,7 +1585,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   timelinePanel: {
-    marginTop: 8,
+    marginTop: 4,
     backgroundColor: "#091121",
     borderWidth: 1,
     borderColor: "#1A2542",
