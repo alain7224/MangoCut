@@ -38,6 +38,29 @@ const BG_VIDEO =
   "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4";
 
 const PANEL_MODES = ["media", "clip", "project"];
+const SKINS = {
+  neon: {
+    bg: "#03050A",
+    panelBg: "rgba(7,11,20,0.98)",
+    panelBorder: "#16203A",
+    previewBg: "rgba(8,14,28,0.96)",
+    previewBorder: "#2D4A82",
+  },
+  light: {
+    bg: "#EAF1FF",
+    panelBg: "rgba(255,255,255,0.95)",
+    panelBorder: "#B8C8E6",
+    previewBg: "#FFFFFF",
+    previewBorder: "#7F9ED8",
+  },
+  dusk: {
+    bg: "#120E1F",
+    panelBg: "rgba(30,20,47,0.95)",
+    panelBorder: "#4A2C78",
+    previewBg: "rgba(25,18,40,0.96)",
+    previewBorder: "#8D63D8",
+  },
+};
 
 function makeId() {
   return "clip_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7);
@@ -204,6 +227,8 @@ export default function EditorScreen({ navigation, route }) {
   const [panelMode, setPanelMode] = useState("media");
   const [showVisualPanel, setShowVisualPanel] = useState(true);
   const [clipboardClip, setClipboardClip] = useState(null);
+  const [skinKey, setSkinKey] = useState("neon");
+  const [audioAccordionOpen, setAudioAccordionOpen] = useState(true);
   const { width } = useWindowDimensions();
 
   const imageTimerRef = useRef(null);
@@ -686,9 +711,10 @@ export default function EditorScreen({ navigation, route }) {
   const hasSequence = clips.length > 0;
   const canEditClip = !!selectedClip;
   const previewHeight = width >= 1200 ? 430 : width >= 900 ? 360 : 250;
+  const skin = SKINS[skinKey];
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: skin.bg }]}>
       <View style={styles.bgVideoWrap}>
         <VideoView
           player={bgPlayer}
@@ -713,7 +739,12 @@ export default function EditorScreen({ navigation, route }) {
       </View>
 
       <View style={[styles.previewSection, { height: previewHeight }]}>
-        <View style={[styles.previewInner, { aspectRatio: previewAspectRatio }]}>
+        <View
+          style={[
+            styles.previewInner,
+            { aspectRatio: previewAspectRatio, backgroundColor: skin.previewBg, borderColor: skin.previewBorder },
+          ]}
+        >
           {!currentClip ? (
             <View style={styles.emptyPreview}>
               <Text style={styles.previewTitle}>Vista previa</Text>
@@ -745,6 +776,9 @@ export default function EditorScreen({ navigation, route }) {
             </Animated.View>
           )}
         </View>
+        <View style={[styles.limitBadge, { borderColor: skin.previewBorder }]}>
+          <Text style={styles.limitBadgeText}>LÍMITE REPRODUCTOR</Text>
+        </View>
 
         {hasSequence && (
           <TouchableOpacity style={styles.floatingPlay} onPress={togglePlay}>
@@ -760,7 +794,21 @@ export default function EditorScreen({ navigation, route }) {
         )}
       </View>
 
-      <View style={styles.dockArea}>
+      <View style={[styles.dockArea, { backgroundColor: skin.panelBg, borderColor: skin.panelBorder }]}>
+        <View style={styles.skinRow}>
+          {Object.keys(SKINS).map((key) => {
+            const active = key === skinKey;
+            return (
+              <TouchableOpacity
+                key={key}
+                style={[styles.skinChip, active && styles.skinChipActive]}
+                onPress={() => setSkinKey(key)}
+              >
+                <Text style={[styles.skinChipText, active && styles.skinChipTextActive]}>{key}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.formatRow}>
           {Object.keys(FORMATS).map((key) => {
             const active = formatKey === key;
@@ -895,7 +943,7 @@ export default function EditorScreen({ navigation, route }) {
           )}
         </View>
 
-        <View style={styles.mediaBin}>
+        <View style={[styles.mediaBin, { borderColor: skin.panelBorder }]}>
           <Text style={styles.trackLabel}>BANDEJA MEDIA ({clips.length})</Text>
           <ScrollView
             horizontal
@@ -939,6 +987,22 @@ export default function EditorScreen({ navigation, route }) {
             <View style={[styles.audioFill, audioTrack && styles.audioFillLoaded]} />
           </View>
         </View>
+        <TouchableOpacity
+          style={styles.audioAccordionHead}
+          onPress={() => setAudioAccordionOpen((v) => !v)}
+        >
+          <Text style={styles.audioAccordionHeadText}>
+            {audioAccordionOpen ? "Acordeón audio ▼" : "Acordeón audio ►"}
+          </Text>
+        </TouchableOpacity>
+        {audioAccordionOpen && (
+          <View style={styles.audioAccordionBody}>
+            <ProButton title="Cargar música" onPress={importAudio} compact />
+            <View style={styles.audioTrackBlock}>
+              <AudioWave active={!!audioTrack} />
+            </View>
+          </View>
+        )}
 
         <View style={styles.transportRow}>
           <TouchableOpacity style={styles.transportBtn} onPress={goPrevManual}>
@@ -1201,6 +1265,46 @@ const styles = StyleSheet.create({
     padding: 10,
     overflow: "hidden",
     minHeight: 320,
+  },
+  skinRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 6,
+  },
+  skinChip: {
+    borderWidth: 1,
+    borderColor: "#3A4F7A",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: "#11182B",
+  },
+  skinChipActive: {
+    backgroundColor: "#FF9500",
+    borderColor: "#FF9500",
+  },
+  skinChipText: {
+    color: "#DCE7FB",
+    fontWeight: "800",
+    fontSize: 11,
+  },
+  skinChipTextActive: {
+    color: "#120E1F",
+  },
+  limitBadge: {
+    marginTop: 6,
+    alignSelf: "flex-start",
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    backgroundColor: "rgba(0,0,0,0.3)",
+  },
+  limitBadgeText: {
+    color: "#B7C7E6",
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0.5,
   },
   formatRow: {
     gap: 8,
@@ -1539,6 +1643,29 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     justifyContent: "center",
     paddingHorizontal: 8,
+  },
+  audioAccordionHead: {
+    marginTop: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#2D4372",
+    backgroundColor: "rgba(12,24,46,0.55)",
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  audioAccordionHeadText: {
+    color: "#C8D7F2",
+    fontWeight: "800",
+    fontSize: 12,
+  },
+  audioAccordionBody: {
+    marginTop: 8,
+    gap: 8,
+    padding: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#2B3D66",
+    backgroundColor: "rgba(11,19,36,0.45)",
   },
   audioWaveWrap: {
     flexDirection: "row",
