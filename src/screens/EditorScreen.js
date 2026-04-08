@@ -13,6 +13,7 @@ import {
   Alert,
   Platform,
   PanResponder,
+  useWindowDimensions,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
@@ -203,6 +204,7 @@ export default function EditorScreen({ navigation, route }) {
   const [panelMode, setPanelMode] = useState("media");
   const [showVisualPanel, setShowVisualPanel] = useState(true);
   const [clipboardClip, setClipboardClip] = useState(null);
+  const { width } = useWindowDimensions();
 
   const imageTimerRef = useRef(null);
   const webAudioRef = useRef(null);
@@ -683,6 +685,7 @@ export default function EditorScreen({ navigation, route }) {
   const previewAspectRatio = FORMATS[formatKey];
   const hasSequence = clips.length > 0;
   const canEditClip = !!selectedClip;
+  const previewHeight = width >= 1200 ? 430 : width >= 900 ? 360 : 250;
 
   return (
     <View style={styles.container}>
@@ -709,7 +712,7 @@ export default function EditorScreen({ navigation, route }) {
         </View>
       </View>
 
-      <View style={styles.previewSection}>
+      <View style={[styles.previewSection, { height: previewHeight }]}>
         <View style={[styles.previewInner, { aspectRatio: previewAspectRatio }]}>
           {!currentClip ? (
             <View style={styles.emptyPreview}>
@@ -890,6 +893,42 @@ export default function EditorScreen({ navigation, route }) {
               <Text style={styles.visualItem}>Modo panel: {panelMode}</Text>
             </View>
           )}
+        </View>
+
+        <View style={styles.mediaBin}>
+          <Text style={styles.trackLabel}>BANDEJA MEDIA ({clips.length})</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.mediaBinRow}
+          >
+            {clips.length === 0 ? (
+              <Text style={styles.mediaBinEmpty}>Añade varios clips para verlos aquí</Text>
+            ) : (
+              clips.map((clip, idx) => (
+                <TouchableOpacity
+                  key={clip.id}
+                  style={[
+                    styles.mediaBinItem,
+                    idx === selectedIndex && styles.mediaBinItemActive,
+                  ]}
+                  onPress={() => {
+                    setSelectedIndex(idx);
+                    setCurrentIndex(idx);
+                  }}
+                >
+                  {clip.type === "image" ? (
+                    <Image source={{ uri: clip.uri }} style={styles.mediaBinThumb} />
+                  ) : (
+                    <View style={styles.mediaBinVideo}>
+                      <Text style={styles.mediaBinVideoText}>VIDEO</Text>
+                    </View>
+                  )}
+                  <Text style={styles.mediaBinLabel}>Clip {idx + 1}</Text>
+                </TouchableOpacity>
+              ))
+            )}
+          </ScrollView>
         </View>
 
         <View style={styles.audioLaneWrap}>
@@ -1083,7 +1122,6 @@ const styles = StyleSheet.create({
   previewSection: {
     paddingHorizontal: 12,
     paddingBottom: 10,
-    height: 250,
   },
   previewInner: {
     width: "100%",
@@ -1293,6 +1331,57 @@ const styles = StyleSheet.create({
   audioLaneWrap: {
     paddingTop: 8,
   },
+  mediaBin: {
+    marginTop: 8,
+    backgroundColor: "rgba(8,18,36,0.72)",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#1B2B4A",
+    padding: 8,
+  },
+  mediaBinRow: {
+    gap: 8,
+    paddingRight: 8,
+  },
+  mediaBinEmpty: {
+    color: "#7F90B1",
+    fontSize: 12,
+    paddingVertical: 8,
+  },
+  mediaBinItem: {
+    width: 82,
+    borderRadius: 10,
+    backgroundColor: "#0D1527",
+    borderWidth: 1,
+    borderColor: "#1C2440",
+    overflow: "hidden",
+  },
+  mediaBinItemActive: {
+    borderColor: "#22C55E",
+  },
+  mediaBinThumb: {
+    width: "100%",
+    height: 52,
+  },
+  mediaBinVideo: {
+    width: "100%",
+    height: 52,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#12213D",
+  },
+  mediaBinVideoText: {
+    color: "#7BE9A9",
+    fontWeight: "800",
+    fontSize: 10,
+  },
+  mediaBinLabel: {
+    color: "#C9D4E6",
+    fontSize: 11,
+    fontWeight: "700",
+    textAlign: "center",
+    paddingVertical: 6,
+  },
   audioLabel: {
     color: "#9BA6B9",
     fontSize: 12,
@@ -1300,11 +1389,11 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   audioLane: {
-    height: 8,
+    height: 12,
     borderRadius: 999,
-    backgroundColor: "#0D1320",
+    backgroundColor: "rgba(13,19,32,0.5)",
     borderWidth: 1,
-    borderColor: "#1C2440",
+    borderColor: "rgba(61,97,153,0.5)",
     overflow: "hidden",
   },
   audioFill: {
@@ -1442,11 +1531,11 @@ const styles = StyleSheet.create({
   },
   audioTrackBlock: {
     marginTop: 6,
-    height: 48,
-    borderRadius: 10,
-    backgroundColor: "#121B2D",
+    height: 58,
+    borderRadius: 14,
+    backgroundColor: "rgba(18,27,45,0.45)",
     borderWidth: 1,
-    borderColor: "#1C2440",
+    borderColor: "rgba(89,132,209,0.45)",
     overflow: "hidden",
     justifyContent: "center",
     paddingHorizontal: 8,
@@ -1455,7 +1544,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 2,
-    height: 38,
+    height: 44,
   },
   audioBar: {
     width: 3,
