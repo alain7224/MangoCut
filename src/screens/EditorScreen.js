@@ -61,6 +61,7 @@ const SKINS = {
     previewBorder: "#8D63D8",
   },
 };
+const PRO_FX = ["Glow", "Shake", "Zoom Beat", "Flash", "Blur"];
 
 function makeId() {
   return "clip_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7);
@@ -225,10 +226,11 @@ export default function EditorScreen({ navigation, route }) {
   const [audioTrack, setAudioTrack] = useState(null);
   const [isPreparingNext, setIsPreparingNext] = useState(false);
   const [panelMode, setPanelMode] = useState("media");
-  const [showVisualPanel, setShowVisualPanel] = useState(true);
+  const [showVisualPanel, setShowVisualPanel] = useState(false);
   const [clipboardClip, setClipboardClip] = useState(null);
   const [skinKey, setSkinKey] = useState("neon");
   const [audioAccordionOpen, setAudioAccordionOpen] = useState(true);
+  const [fxPreset, setFxPreset] = useState("Glow");
   const { width } = useWindowDimensions();
 
   const imageTimerRef = useRef(null);
@@ -795,6 +797,11 @@ export default function EditorScreen({ navigation, route }) {
       </View>
 
       <View style={[styles.dockArea, { backgroundColor: skin.panelBg, borderColor: skin.panelBorder }]}>
+        <ScrollView
+          style={styles.dockScroll}
+          contentContainerStyle={styles.dockScrollContent}
+          showsVerticalScrollIndicator={true}
+        >
         <View style={styles.skinRow}>
           {Object.keys(SKINS).map((key) => {
             const active = key === skinKey;
@@ -909,6 +916,22 @@ export default function EditorScreen({ navigation, route }) {
                   compact
                   disabled={!canEditClip || selectedClip?.type !== "image"}
                 />
+              </View>
+              <View style={styles.fxRow}>
+                {PRO_FX.map((fx) => {
+                  const active = fxPreset === fx;
+                  return (
+                    <TouchableOpacity
+                      key={fx}
+                      style={[styles.fxChip, active && styles.fxChipActive]}
+                      onPress={() => setFxPreset(fx)}
+                    >
+                      <Text style={[styles.fxChipText, active && styles.fxChipTextActive]}>
+                        {fx}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             </>
           )}
@@ -1074,6 +1097,7 @@ export default function EditorScreen({ navigation, route }) {
             <AudioWave active={!!audioTrack} />
           </View>
         </View>
+        </ScrollView>
       </View>
 
       <Modal visible={transitionModalVisible} transparent animationType="fade">
@@ -1263,8 +1287,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#16203A",
     padding: 10,
-    overflow: "hidden",
+    overflow: "visible",
     minHeight: 320,
+  },
+  dockScroll: {
+    flex: 1,
+  },
+  dockScrollContent: {
+    paddingBottom: 16,
   },
   skinRow: {
     flexDirection: "row",
@@ -1404,6 +1434,32 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 8,
     paddingTop: 8,
+  },
+  fxRow: {
+    marginTop: 8,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  fxChip: {
+    borderWidth: 1,
+    borderColor: "#2D4372",
+    backgroundColor: "rgba(14,23,44,0.7)",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  fxChipActive: {
+    borderColor: "#22C55E",
+    backgroundColor: "rgba(34,197,94,0.2)",
+  },
+  fxChipText: {
+    color: "#C8D7F2",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  fxChipTextActive: {
+    color: "#9CFFBF",
   },
   primaryBtn: {
     borderRadius: 18,
