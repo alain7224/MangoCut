@@ -1002,14 +1002,6 @@ export default function EditorScreen({ navigation, route }) {
           </ScrollView>
         </View>
 
-        <View style={styles.audioLaneWrap}>
-          <Text style={styles.audioLabel}>
-            {audioTrack ? `Audio: ${audioTrack.name}` : "Audio: no cargado"}
-          </Text>
-          <View style={styles.audioLane}>
-            <View style={[styles.audioFill, audioTrack && styles.audioFillLoaded]} />
-          </View>
-        </View>
         <TouchableOpacity
           style={styles.audioAccordionHead}
           onPress={() => setAudioAccordionOpen((v) => !v)}
@@ -1286,7 +1278,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(7,11,20,0.98)",
     borderWidth: 1,
     borderColor: "#16203A",
-    padding: 10,
+    padding: 8,
     overflow: "visible",
     minHeight: 320,
   },
@@ -1299,7 +1291,7 @@ const styles = StyleSheet.create({
   skinRow: {
     flexDirection: "row",
     gap: 8,
-    marginBottom: 6,
+    marginBottom: 4,
   },
   skinChip: {
     borderWidth: 1,
@@ -1338,19 +1330,20 @@ const styles = StyleSheet.create({
   },
   formatRow: {
     gap: 8,
-    paddingBottom: 6,
+    paddingBottom: 2,
+    alignItems: "center",
   },
   formatChip: {
     backgroundColor: "#10182B",
     borderColor: "#1C2440",
     borderWidth: 1,
-    borderRadius: 18,
-    paddingVertical: 9,
-    paddingHorizontal: 14,
+    borderRadius: 12,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
   },
   formatChipActive: {
-    backgroundColor: "#22C55E",
-    borderColor: "#22C55E",
+    backgroundColor: "#1B2A49",
+    borderColor: "#4E7CD6",
   },
   formatChipText: {
     color: "#E8ECF3",
@@ -1358,7 +1351,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   formatChipTextActive: {
-    color: "#04130A",
+    color: "#D9E7FF",
   },
   actionPanel: {
     marginTop: 2,
@@ -1492,12 +1485,12 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
   mediaBin: {
-    marginTop: 8,
+    marginTop: 6,
     backgroundColor: "rgba(8,18,36,0.72)",
     borderRadius: 12,
     borderWidth: 1,
     borderColor: "#1B2B4A",
-    padding: 8,
+    padding: 6,
   },
   mediaBinRow: {
     gap: 8,
@@ -1521,11 +1514,11 @@ const styles = StyleSheet.create({
   },
   mediaBinThumb: {
     width: "100%",
-    height: 52,
+    height: 46,
   },
   mediaBinVideo: {
     width: "100%",
-    height: 52,
+    height: 46,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#12213D",
@@ -1537,10 +1530,10 @@ const styles = StyleSheet.create({
   },
   mediaBinLabel: {
     color: "#C9D4E6",
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "700",
     textAlign: "center",
-    paddingVertical: 6,
+    paddingVertical: 4,
   },
   audioLabel: {
     color: "#9BA6B9",
@@ -1690,8 +1683,8 @@ const styles = StyleSheet.create({
     fontSize: 9,
   },
   audioTrackBlock: {
-    marginTop: 6,
-    height: 58,
+    marginTop: 4,
+    height: 44,
     borderRadius: 14,
     backgroundColor: "rgba(18,27,45,0.45)",
     borderWidth: 1,
@@ -1727,10 +1720,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 2,
-    height: 44,
+    height: 28,
   },
   audioBar: {
-    width: 3,
+    width: 2,
     borderRadius: 4,
     alignSelf: "center",
   },
