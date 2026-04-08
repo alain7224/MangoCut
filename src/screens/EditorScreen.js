@@ -36,11 +36,13 @@ const FORMATS = {
 const BG_VIDEO =
   "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4";
 
+const PANEL_MODES = ["media", "clip", "project"];
+
 function makeId() {
   return "clip_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7);
 }
 
-function ProButton({ title, onPress, primary = false, compact = false }) {
+function ProButton({ title, onPress, primary = false, compact = false, disabled = false }) {
   const scale = useRef(new Animated.Value(1)).current;
 
   const pressIn = () => {
@@ -62,8 +64,12 @@ function ProButton({ title, onPress, primary = false, compact = false }) {
   };
 
   return (
-    <Pressable onPress={onPress} onPressIn={pressIn} onPressOut={pressOut}>
-      <Animated.View style={{ transform: [{ scale }] }}>
+    <Pressable
+      onPress={disabled ? undefined : onPress}
+      onPressIn={disabled ? undefined : pressIn}
+      onPressOut={disabled ? undefined : pressOut}
+    >
+      <Animated.View style={{ transform: [{ scale }], opacity: disabled ? 0.45 : 1 }}>
         {primary ? (
           <LinearGradient
             colors={["#FFB84D", "#FF8A00"]}
@@ -194,6 +200,9 @@ export default function EditorScreen({ navigation, route }) {
 
   const [audioTrack, setAudioTrack] = useState(null);
   const [isPreparingNext, setIsPreparingNext] = useState(false);
+  const [panelMode, setPanelMode] = useState("media");
+  const [showVisualPanel, setShowVisualPanel] = useState(true);
+  const [clipboardClip, setClipboardClip] = useState(null);
 
   const imageTimerRef = useRef(null);
   const webAudioRef = useRef(null);
@@ -395,6 +404,11 @@ export default function EditorScreen({ navigation, route }) {
           if (cancelled) return;
           mediaPlayer.currentTime = 0;
           mediaPlayer.play();
+          if (currentClip.duration) {
+            imageTimerRef.current = setTimeout(() => {
+              if (!cancelled) advanceToNext();
+            }, currentClip.duration);
+          }
         } catch (e) {
           console.log("Error cargando video:", e);
         }
@@ -515,6 +529,62 @@ export default function EditorScreen({ navigation, route }) {
     setCurrentIndex(safe);
   };
 
+  const duplicateSelected = () => {
+    if (!selectedClip) return;
+    const duplicate = { ...selectedClip, id: makeId() };
+    setClips((prev) => {
+      const next = [...prev];
+      next.splice(selectedIndex + 1, 0, duplicate);
+      return next.slice(0, 15);
+    });
+    setSelectedIndex((i) => Math.min(i + 1, 14));
+    setCurrentIndex((i) => Math.min(i + 1, 14));
+  };
+
+  const copySelected = () => {
+    if (!selectedClip) return;
+    setClipboardClip({ ...selectedClip });
+    Alert.alert("Copiado", "Clip copiado al portapapeles.");
+  };
+
+  const cutSelected = () => {
+    if (!selectedClip) return;
+    setClipboardClip({ ...selectedClip });
+    removeSelected();
+  };
+
+  const pasteClipboard = () => {
+    if (!clipboardClip) return;
+    const pasted = { ...clipboardClip, id: makeId() };
+    const pasteIndex = Math.min(selectedIndex + 1, clips.length);
+    setClips((prev) => {
+      const next = [...prev];
+      next.splice(pasteIndex, 0, pasted);
+      return next.slice(0, 15);
+    });
+    setSelectedIndex(Math.min(pasteIndex, 14));
+    setCurrentIndex(Math.min(pasteIndex, 14));
+  };
+
+  const rebuildTransitionsAfterMove = (oldClips, newClips) => {
+    const oldPairMap = {};
+    for (let i = 0; i < oldClips.length - 1; i++) {
+      const from = oldClips[i]?.id;
+      const to = oldClips[i + 1]?.id;
+      if (!from || !to) continue;
+      oldPairMap[`${from}->${to}`] = transitionsByGap[i] || "";
+    }
+
+    const nextTransitions = {};
+    for (let i = 0; i < newClips.length - 1; i++) {
+      const key = `${newClips[i]?.id}->${newClips[i + 1]?.id}`;
+      if (oldPairMap[key]) {
+        nextTransitions[i] = oldPairMap[key];
+      }
+    }
+    return nextTransitions;
+  };
+
   const moveClipByDrag = (fromIndex, delta) => {
     if (!clips.length) return;
 
@@ -526,6 +596,7 @@ export default function EditorScreen({ navigation, route }) {
     next.splice(toIndex, 0, moved);
 
     setClips(next);
+    setTransitionsByGap(rebuildTransitionsAfterMove(clips, next));
     setSelectedIndex(toIndex);
     setCurrentIndex((prev) => {
       if (prev === fromIndex) return toIndex;
@@ -545,6 +616,19 @@ export default function EditorScreen({ navigation, route }) {
     if (!selectedClip || selectedClip.type !== "image") return;
     setClips((prev) =>
       prev.map((clip, i) => (i === selectedIndex ? { ...clip, duration: ms } : clip))
+    );
+  };
+
+  const stretchSelected = (deltaMs) => {
+    if (!selectedClip) return;
+    const base =
+      selectedClip.duration ||
+      (selectedClip.type === "image"
+        ? IMAGE_DEFAULT_DURATION
+        : Math.max(1500, Math.floor((selectedClip.duration || 3000) / 1)));
+    const nextDuration = Math.max(300, base + deltaMs);
+    setClips((prev) =>
+      prev.map((clip, i) => (i === selectedIndex ? { ...clip, duration: nextDuration } : clip))
     );
   };
 
@@ -598,6 +682,7 @@ export default function EditorScreen({ navigation, route }) {
 
   const previewAspectRatio = FORMATS[formatKey];
   const hasSequence = clips.length > 0;
+  const canEditClip = !!selectedClip;
 
   return (
     <View style={styles.container}>
@@ -691,23 +776,120 @@ export default function EditorScreen({ navigation, route }) {
         </ScrollView>
 
         <View style={styles.actionPanel}>
-          <View style={styles.toolbarRow}>
-            <ProButton title="Importar" onPress={importMedia} primary />
-            <ProButton title="Sonido" onPress={importAudio} />
-            <ProButton title="Guardar" onPress={handleSaveProject} />
-            <ProButton title="Cargar" onPress={handleLoadProject} />
-            <ProButton title="Descargar" onPress={downloadProject} />
-            <ProButton title="Borrar" onPress={removeSelected} />
+          <View style={styles.panelTabs}>
+            {PANEL_MODES.map((mode) => {
+              const active = panelMode === mode;
+              const title =
+                mode === "media" ? "Media" : mode === "clip" ? "Clip" : "Proyecto";
+              return (
+                <TouchableOpacity
+                  key={mode}
+                  onPress={() => setPanelMode(mode)}
+                  style={[styles.panelTab, active && styles.panelTabActive]}
+                >
+                  <Text style={[styles.panelTabText, active && styles.panelTabTextActive]}>
+                    {title}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
 
-          <View style={styles.toolbarRow}>
-            <ProButton title="← Mover" onPress={moveLeft} compact />
-            <ProButton title="Mover →" onPress={moveRight} compact />
-            <ProButton title="0.3 s" onPress={() => setImageDuration(300)} compact />
-            <ProButton title="1 s" onPress={() => setImageDuration(1000)} compact />
-            <ProButton title="3 s" onPress={() => setImageDuration(3000)} compact />
-            <ProButton title="5 s" onPress={() => setImageDuration(5000)} compact />
-          </View>
+          {panelMode === "media" && (
+            <View style={styles.toolbarRow}>
+              <ProButton title="Importar" onPress={importMedia} primary />
+              <ProButton title="Sonido" onPress={importAudio} />
+              <ProButton title="Borrar clip" onPress={removeSelected} disabled={!canEditClip} />
+              <ProButton title="Duplicar" onPress={duplicateSelected} disabled={!canEditClip} />
+            </View>
+          )}
+
+          {panelMode === "clip" && (
+            <>
+              <Text style={styles.panelInfoText}>
+                {canEditClip
+                  ? `Editando: ${selectedClip.type === "image" ? "Imagen" : "Video"}`
+                  : "Selecciona un clip para editar"}
+              </Text>
+              <View style={styles.toolbarRow}>
+                <ProButton title="← Mover" onPress={moveLeft} compact disabled={!canEditClip} />
+                <ProButton title="Mover →" onPress={moveRight} compact disabled={!canEditClip} />
+                <ProButton title="Cortar" onPress={cutSelected} compact disabled={!canEditClip} />
+                <ProButton title="Copiar" onPress={copySelected} compact disabled={!canEditClip} />
+                <ProButton
+                  title="Pegar"
+                  onPress={pasteClipboard}
+                  compact
+                  disabled={!clipboardClip || clips.length >= 15}
+                />
+                <ProButton
+                  title="Estirar +0.5s"
+                  onPress={() => stretchSelected(500)}
+                  compact
+                  disabled={!canEditClip}
+                />
+                <ProButton
+                  title="Encoger -0.5s"
+                  onPress={() => stretchSelected(-500)}
+                  compact
+                  disabled={!canEditClip}
+                />
+                <ProButton
+                  title="0.3 s"
+                  onPress={() => setImageDuration(300)}
+                  compact
+                  disabled={!canEditClip || selectedClip?.type !== "image"}
+                />
+                <ProButton
+                  title="1 s"
+                  onPress={() => setImageDuration(1000)}
+                  compact
+                  disabled={!canEditClip || selectedClip?.type !== "image"}
+                />
+                <ProButton
+                  title="3 s"
+                  onPress={() => setImageDuration(3000)}
+                  compact
+                  disabled={!canEditClip || selectedClip?.type !== "image"}
+                />
+                <ProButton
+                  title="5 s"
+                  onPress={() => setImageDuration(5000)}
+                  compact
+                  disabled={!canEditClip || selectedClip?.type !== "image"}
+                />
+              </View>
+            </>
+          )}
+
+          {panelMode === "project" && (
+            <View style={styles.toolbarRow}>
+              <ProButton title="Guardar" onPress={handleSaveProject} />
+              <ProButton title="Cargar" onPress={handleLoadProject} />
+              <ProButton title="Descargar" onPress={downloadProject} />
+            </View>
+          )}
+
+          <TouchableOpacity
+            onPress={() => setShowVisualPanel((v) => !v)}
+            style={styles.visualToggle}
+          >
+            <Text style={styles.visualToggleText}>
+              {showVisualPanel ? "Ocultar panel visual" : "Mostrar panel visual"}
+            </Text>
+          </TouchableOpacity>
+
+          {showVisualPanel && (
+            <View style={styles.visualPanel}>
+              <Text style={styles.visualTitle}>Panel visual de estado</Text>
+              <Text style={styles.visualItem}>Formato: {formatKey}</Text>
+              <Text style={styles.visualItem}>Clips: {clips.length}</Text>
+              <Text style={styles.visualItem}>Seleccionado: {clips.length ? selectedIndex + 1 : "-"}</Text>
+              <Text style={styles.visualItem}>Actual: {clips.length ? currentIndex + 1 : "-"}</Text>
+              <Text style={styles.visualItem}>Audio: {audioTrack ? "Cargado" : "Sin audio"}</Text>
+              <Text style={styles.visualItem}>Modo panel: {panelMode}</Text>
+            </View>
+          )}
         </View>
 
         <View style={styles.audioLaneWrap}>
@@ -1008,6 +1190,72 @@ const styles = StyleSheet.create({
   },
   actionPanel: {
     marginTop: 2,
+  },
+  panelTabs: {
+    flexDirection: "row",
+    gap: 8,
+    paddingTop: 8,
+  },
+  panelTab: {
+    backgroundColor: "#0F1627",
+    borderColor: "#1C2440",
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+  },
+  panelTabActive: {
+    backgroundColor: "#FF9500",
+    borderColor: "#FF9500",
+  },
+  panelTabText: {
+    color: "#C9D4E6",
+    fontWeight: "800",
+    fontSize: 12,
+  },
+  panelTabTextActive: {
+    color: "#111015",
+  },
+  panelInfoText: {
+    color: "#93A0BA",
+    fontSize: 12,
+    marginTop: 8,
+    fontWeight: "700",
+  },
+  visualToggle: {
+    marginTop: 10,
+    alignSelf: "flex-start",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    backgroundColor: "#10182B",
+    borderWidth: 1,
+    borderColor: "#1C2440",
+  },
+  visualToggleText: {
+    color: "#C9D4E6",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  visualPanel: {
+    marginTop: 8,
+    backgroundColor: "#0C1426",
+    borderWidth: 1,
+    borderColor: "#1C2440",
+    borderRadius: 12,
+    padding: 10,
+    gap: 3,
+  },
+  visualTitle: {
+    color: "#F5F7FA",
+    fontWeight: "800",
+    marginBottom: 4,
+    fontSize: 12,
+  },
+  visualItem: {
+    color: "#97A8C4",
+    fontSize: 12,
+    fontWeight: "700",
   },
   toolbarRow: {
     flexDirection: "row",
