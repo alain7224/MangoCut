@@ -37,7 +37,6 @@ const FORMATS = {
 const BG_VIDEO =
   "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4";
 
-const PANEL_MODES = ["media", "clip", "project"];
 const SKINS = {
   neon: {
     bg: "#03050A",
@@ -223,13 +222,10 @@ export default function EditorScreen({ navigation, route }) {
   const [transitionsByGap, setTransitionsByGap] = useState({});
   const [formatKey, setFormatKey] = useState("16:9");
 
-  const [audioTrack, setAudioTrack] = useState(null);
+  const [audioTracks, setAudioTracks] = useState([]);
   const [isPreparingNext, setIsPreparingNext] = useState(false);
-  const [panelMode, setPanelMode] = useState("media");
-  const [showVisualPanel, setShowVisualPanel] = useState(false);
   const [clipboardClip, setClipboardClip] = useState(null);
   const [skinKey, setSkinKey] = useState("neon");
-  const [audioAccordionOpen, setAudioAccordionOpen] = useState(true);
   const [fxPreset, setFxPreset] = useState("Glow");
   const { width } = useWindowDimensions();
 
@@ -292,15 +288,16 @@ export default function EditorScreen({ navigation, route }) {
 
   const syncWebAudio = () => {
     if (Platform.OS !== "web") return;
-    if (!audioTrack?.uri) return;
+    const primaryTrack = audioTracks[0];
+    if (!primaryTrack?.uri) return;
 
     if (!webAudioRef.current) {
-      webAudioRef.current = new Audio(audioTrack.uri);
+      webAudioRef.current = new Audio(primaryTrack.uri);
       webAudioRef.current.loop = true;
       webAudioRef.current.volume = 0.9;
-    } else if (webAudioRef.current.src !== audioTrack.uri) {
+    } else if (webAudioRef.current.src !== primaryTrack.uri) {
       webAudioRef.current.pause();
-      webAudioRef.current = new Audio(audioTrack.uri);
+      webAudioRef.current = new Audio(primaryTrack.uri);
       webAudioRef.current.loop = true;
       webAudioRef.current.volume = 0.9;
     }
@@ -314,7 +311,7 @@ export default function EditorScreen({ navigation, route }) {
 
   useEffect(() => {
     syncWebAudio();
-  }, [audioTrack, isPlaying]);
+  }, [audioTracks, isPlaying]);
 
   const buildProjectPayload = () => ({
     templateName,
@@ -323,7 +320,7 @@ export default function EditorScreen({ navigation, route }) {
     currentIndex,
     transitionsByGap,
     formatKey,
-    audioTrack,
+    audioTracks,
     createdAt: new Date().toISOString(),
   });
 
@@ -349,7 +346,7 @@ export default function EditorScreen({ navigation, route }) {
       setCurrentIndex(project.currentIndex || 0);
       setTransitionsByGap(project.transitionsByGap || {});
       setFormatKey(project.formatKey || "16:9");
-      setAudioTrack(project.audioTrack || null);
+      setAudioTracks(project.audioTracks || []);
       Alert.alert("Cargado", "Proyecto restaurado.");
     } catch (e) {
       Alert.alert("Error", "No se pudo cargar el proyecto.");
@@ -495,7 +492,7 @@ export default function EditorScreen({ navigation, route }) {
         uri: result.assets[0].uri,
       };
 
-      setAudioTrack(track);
+      setAudioTracks((prev) => [...prev, { ...track, id: makeId() }].slice(0, 8));
 
       if (Platform.OS === "web") {
         setTimeout(() => {
@@ -834,154 +831,116 @@ export default function EditorScreen({ navigation, route }) {
         </ScrollView>
 
         <View style={styles.actionPanel}>
-          <View style={styles.panelTabs}>
-            {PANEL_MODES.map((mode) => {
-              const active = panelMode === mode;
-              const title =
-                mode === "media" ? "Media" : mode === "clip" ? "Clip" : "Proyecto";
-              return (
-                <TouchableOpacity
-                  key={mode}
-                  onPress={() => setPanelMode(mode)}
-                  style={[styles.panelTab, active && styles.panelTabActive]}
-                >
-                  <Text style={[styles.panelTabText, active && styles.panelTabTextActive]}>
-                    {title}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+          <View style={[styles.mediaRail, { borderColor: skin.panelBorder }]}>
+            <Text style={styles.mediaRailTitle}>MEDIA</Text>
+            <ScrollView showsVerticalScrollIndicator={true} contentContainerStyle={styles.mediaRailList}>
+              {clips.length === 0 ? (
+                <Text style={styles.mediaRailEmpty}>Sin clips</Text>
+              ) : (
+                clips.map((clip, idx) => (
+                  <TouchableOpacity
+                    key={clip.id}
+                    style={[styles.mediaRailItem, idx === selectedIndex && styles.mediaRailItemActive]}
+                    onPress={() => {
+                      setSelectedIndex(idx);
+                      setCurrentIndex(idx);
+                    }}
+                  >
+                    {clip.type === "image" ? (
+                      <Image source={{ uri: clip.uri }} style={styles.mediaRailThumb} />
+                    ) : (
+                      <View style={styles.mediaRailVideo}>
+                        <Text style={styles.mediaRailVideoText}>V</Text>
+                      </View>
+                    )}
+                    <Text style={styles.mediaRailLabel}>{idx + 1}</Text>
+                  </TouchableOpacity>
+                ))
+              )}
+            </ScrollView>
           </View>
-
-          {panelMode === "media" && (
-            <View style={styles.toolbarRow}>
-              <ProButton title="Importar" onPress={importMedia} primary />
-              <ProButton title="Sonido" onPress={importAudio} />
-              <ProButton title="Borrar clip" onPress={removeSelected} disabled={!canEditClip} />
-              <ProButton title="Duplicar" onPress={duplicateSelected} disabled={!canEditClip} />
+          <View style={styles.actionMain}>
+            <View style={styles.quickButtonsCol}>
+              <ProButton title="Importar" onPress={importMedia} primary compact />
+              <ProButton title="Sonido" onPress={importAudio} compact />
+              <ProButton title="Guardar" onPress={handleSaveProject} compact />
+              <ProButton title="Cargar" onPress={handleLoadProject} compact />
+              <ProButton title="Descargar" onPress={downloadProject} compact />
             </View>
-          )}
 
-          {panelMode === "clip" && (
-            <>
-              <Text style={styles.panelInfoText}>
-                {canEditClip
-                  ? `Editando: ${selectedClip.type === "image" ? "Imagen" : "Video"}`
-                  : "Selecciona un clip para editar"}
-              </Text>
-              <View style={styles.toolbarRow}>
-                <ProButton title="← Mover" onPress={moveLeft} compact disabled={!canEditClip} />
-                <ProButton title="Mover →" onPress={moveRight} compact disabled={!canEditClip} />
-                <ProButton title="Cortar" onPress={cutSelected} compact disabled={!canEditClip} />
-                <ProButton title="Copiar" onPress={copySelected} compact disabled={!canEditClip} />
-                <ProButton
-                  title="Pegar"
-                  onPress={pasteClipboard}
-                  compact
-                  disabled={!clipboardClip || clips.length >= 15}
-                />
-                <ProButton
-                  title="Estirar +0.5s"
-                  onPress={() => stretchSelected(500)}
-                  compact
-                  disabled={!canEditClip}
-                />
-                <ProButton
-                  title="Encoger -0.5s"
-                  onPress={() => stretchSelected(-500)}
-                  compact
-                  disabled={!canEditClip}
-                />
-                <ProButton
-                  title="0.3 s"
-                  onPress={() => setImageDuration(300)}
-                  compact
-                  disabled={!canEditClip || selectedClip?.type !== "image"}
-                />
-                <ProButton
-                  title="1 s"
-                  onPress={() => setImageDuration(1000)}
-                  compact
-                  disabled={!canEditClip || selectedClip?.type !== "image"}
-                />
-                <ProButton
-                  title="3 s"
-                  onPress={() => setImageDuration(3000)}
-                  compact
-                  disabled={!canEditClip || selectedClip?.type !== "image"}
-                />
-                <ProButton
-                  title="5 s"
-                  onPress={() => setImageDuration(5000)}
-                  compact
-                  disabled={!canEditClip || selectedClip?.type !== "image"}
-                />
-              </View>
-              <View style={styles.fxRow}>
-                {PRO_FX.map((fx) => {
-                  const active = fxPreset === fx;
-                  return (
-                    <TouchableOpacity
-                      key={fx}
-                      style={[styles.fxChip, active && styles.fxChipActive]}
-                      onPress={() => setFxPreset(fx)}
-                    >
-                      <Text style={[styles.fxChipText, active && styles.fxChipTextActive]}>
-                        {fx}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </>
-          )}
-
-          {panelMode === "project" && (
-            <View style={styles.toolbarRow}>
-              <ProButton title="Guardar" onPress={handleSaveProject} />
-              <ProButton title="Cargar" onPress={handleLoadProject} />
-              <ProButton title="Descargar" onPress={downloadProject} />
-            </View>
-          )}
-
-          <TouchableOpacity
-            onPress={() => setShowVisualPanel((v) => !v)}
-            style={styles.visualToggle}
-          >
-            <Text style={styles.visualToggleText}>
-              {showVisualPanel ? "Ocultar panel visual" : "Mostrar panel visual"}
+            <Text style={styles.panelInfoText}>
+              {canEditClip
+                ? `Editando: ${selectedClip.type === "image" ? "Imagen" : "Video"}`
+                : "Selecciona un clip para editar"}
             </Text>
-          </TouchableOpacity>
-
-          {showVisualPanel && (
-            <View style={styles.visualPanel}>
-              <Text style={styles.visualTitle}>Panel visual de estado</Text>
-              <Text style={styles.visualItem}>Formato: {formatKey}</Text>
-              <Text style={styles.visualItem}>Clips: {clips.length}</Text>
-              <Text style={styles.visualItem}>Seleccionado: {clips.length ? selectedIndex + 1 : "-"}</Text>
-              <Text style={styles.visualItem}>Actual: {clips.length ? currentIndex + 1 : "-"}</Text>
-              <Text style={styles.visualItem}>Audio: {audioTrack ? "Cargado" : "Sin audio"}</Text>
-              <Text style={styles.visualItem}>Modo panel: {panelMode}</Text>
+            <View style={styles.toolbarRow}>
+              <ProButton title="Borrar clip" onPress={removeSelected} compact disabled={!canEditClip} />
+              <ProButton title="Duplicar" onPress={duplicateSelected} compact disabled={!canEditClip} />
+              <ProButton title="← Mover" onPress={moveLeft} compact disabled={!canEditClip} />
+              <ProButton title="Mover →" onPress={moveRight} compact disabled={!canEditClip} />
+              <ProButton title="Cortar" onPress={cutSelected} compact disabled={!canEditClip} />
+              <ProButton title="Copiar" onPress={copySelected} compact disabled={!canEditClip} />
+              <ProButton
+                title="Pegar"
+                onPress={pasteClipboard}
+                compact
+                disabled={!clipboardClip || clips.length >= 15}
+              />
+              <ProButton
+                title="Estirar +0.5s"
+                onPress={() => stretchSelected(500)}
+                compact
+                disabled={!canEditClip}
+              />
+              <ProButton
+                title="Encoger -0.5s"
+                onPress={() => stretchSelected(-500)}
+                compact
+                disabled={!canEditClip}
+              />
+              <ProButton
+                title="0.3 s"
+                onPress={() => setImageDuration(300)}
+                compact
+                disabled={!canEditClip || selectedClip?.type !== "image"}
+              />
+              <ProButton
+                title="1 s"
+                onPress={() => setImageDuration(1000)}
+                compact
+                disabled={!canEditClip || selectedClip?.type !== "image"}
+              />
+              <ProButton
+                title="3 s"
+                onPress={() => setImageDuration(3000)}
+                compact
+                disabled={!canEditClip || selectedClip?.type !== "image"}
+              />
+              <ProButton
+                title="5 s"
+                onPress={() => setImageDuration(5000)}
+                compact
+                disabled={!canEditClip || selectedClip?.type !== "image"}
+              />
             </View>
-          )}
-        </View>
-
-        <TouchableOpacity
-          style={styles.audioAccordionHead}
-          onPress={() => setAudioAccordionOpen((v) => !v)}
-        >
-          <Text style={styles.audioAccordionHeadText}>
-            {audioAccordionOpen ? "Acordeón audio ▼" : "Acordeón audio ►"}
-          </Text>
-        </TouchableOpacity>
-        {audioAccordionOpen && (
-          <View style={styles.audioAccordionBody}>
-            <ProButton title="Cargar música" onPress={importAudio} compact />
-            <View style={styles.audioTrackBlock}>
-              <AudioWave active={!!audioTrack} />
+            <View style={styles.fxRow}>
+              {PRO_FX.map((fx) => {
+                const active = fxPreset === fx;
+                return (
+                  <TouchableOpacity
+                    key={fx}
+                    style={[styles.fxChip, active && styles.fxChipActive]}
+                    onPress={() => setFxPreset(fx)}
+                  >
+                    <Text style={[styles.fxChipText, active && styles.fxChipTextActive]}>
+                      {fx}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
-        )}
+        </View>
 
         <View style={styles.transportRow}>
           <TouchableOpacity style={styles.transportBtn} onPress={goPrevManual}>
@@ -1049,46 +1008,24 @@ export default function EditorScreen({ navigation, route }) {
           </View>
 
           <Text style={[styles.trackLabel, { marginTop: 10 }]}>PISTA AUDIO</Text>
-          <View style={styles.audioTrackBlock}>
-            <AudioWave active={!!audioTrack} />
+          <View style={styles.audioTimelineTrack}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={true} contentContainerStyle={styles.audioSegmentsRow}>
+              {audioTracks.length === 0 ? (
+                <Text style={styles.audioTimelineEmpty}>Sin pistas de audio. Pulsa “Sonido” para cargar.</Text>
+              ) : (
+                audioTracks.map((track, idx) => (
+                  <View key={track.id || idx} style={styles.audioSegmentBlock}>
+                    <Text numberOfLines={1} style={styles.audioSegmentTitle}>
+                      {track.name || `Audio ${idx + 1}`}
+                    </Text>
+                    <AudioWave active />
+                  </View>
+                ))
+              )}
+            </ScrollView>
           </View>
         </View>
 
-        <View style={[styles.mediaBin, { borderColor: skin.panelBorder }]}>
-          <Text style={styles.trackLabel}>BANDEJA MEDIA ({clips.length})</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.mediaBinRow}
-          >
-            {clips.length === 0 ? (
-              <Text style={styles.mediaBinEmpty}>Añade varios clips para verlos aquí</Text>
-            ) : (
-              clips.map((clip, idx) => (
-                <TouchableOpacity
-                  key={clip.id}
-                  style={[
-                    styles.mediaBinItem,
-                    idx === selectedIndex && styles.mediaBinItemActive,
-                  ]}
-                  onPress={() => {
-                    setSelectedIndex(idx);
-                    setCurrentIndex(idx);
-                  }}
-                >
-                  {clip.type === "image" ? (
-                    <Image source={{ uri: clip.uri }} style={styles.mediaBinThumb} />
-                  ) : (
-                    <View style={styles.mediaBinVideo}>
-                      <Text style={styles.mediaBinVideoText}>VIDEO</Text>
-                    </View>
-                  )}
-                  <Text style={styles.mediaBinLabel}>Clip {idx + 1}</Text>
-                </TouchableOpacity>
-              ))
-            )}
-          </ScrollView>
-        </View>
         </ScrollView>
       </View>
 
@@ -1355,71 +1292,78 @@ const styles = StyleSheet.create({
   },
   actionPanel: {
     marginTop: 2,
-  },
-  panelTabs: {
     flexDirection: "row",
     gap: 8,
-    paddingTop: 8,
+    alignItems: "flex-start",
   },
-  panelTab: {
-    backgroundColor: "#0F1627",
-    borderColor: "#1C2440",
+  actionMain: {
+    flex: 1,
+  },
+  quickButtonsCol: {
+    alignSelf: "flex-end",
+    flexDirection: "column",
+    gap: 8,
+    marginBottom: 6,
+  },
+  mediaRail: {
+    width: 86,
     borderWidth: 1,
     borderRadius: 12,
-    paddingVertical: 7,
-    paddingHorizontal: 12,
+    backgroundColor: "rgba(10,17,32,0.75)",
+    padding: 6,
+    maxHeight: 210,
   },
-  panelTabActive: {
-    backgroundColor: "#FF9500",
-    borderColor: "#FF9500",
+  mediaRailTitle: {
+    color: "#94A7CB",
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 1,
+    marginBottom: 6,
   },
-  panelTabText: {
+  mediaRailList: {
+    gap: 6,
+    paddingBottom: 6,
+  },
+  mediaRailEmpty: {
+    color: "#7F90B1",
+    fontSize: 11,
+  },
+  mediaRailItem: {
+    borderWidth: 1,
+    borderColor: "#26385E",
+    borderRadius: 8,
+    overflow: "hidden",
+    backgroundColor: "#0E162C",
+  },
+  mediaRailItemActive: {
+    borderColor: "#22C55E",
+  },
+  mediaRailThumb: {
+    width: "100%",
+    height: 44,
+  },
+  mediaRailVideo: {
+    width: "100%",
+    height: 44,
+    backgroundColor: "#1B2A49",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  mediaRailVideoText: {
+    color: "#D9E7FF",
+    fontWeight: "900",
+  },
+  mediaRailLabel: {
     color: "#C9D4E6",
-    fontWeight: "800",
-    fontSize: 12,
-  },
-  panelTabTextActive: {
-    color: "#111015",
+    textAlign: "center",
+    fontSize: 10,
+    fontWeight: "700",
+    paddingVertical: 3,
   },
   panelInfoText: {
     color: "#93A0BA",
     fontSize: 12,
-    marginTop: 8,
-    fontWeight: "700",
-  },
-  visualToggle: {
-    marginTop: 10,
-    alignSelf: "flex-start",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 10,
-    backgroundColor: "#10182B",
-    borderWidth: 1,
-    borderColor: "#1C2440",
-  },
-  visualToggleText: {
-    color: "#C9D4E6",
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  visualPanel: {
-    marginTop: 8,
-    backgroundColor: "#0C1426",
-    borderWidth: 1,
-    borderColor: "#1C2440",
-    borderRadius: 12,
-    padding: 10,
-    gap: 3,
-  },
-  visualTitle: {
-    color: "#F5F7FA",
-    fontWeight: "800",
-    marginBottom: 4,
-    fontSize: 12,
-  },
-  visualItem: {
-    color: "#97A8C4",
-    fontSize: 12,
+    marginTop: 4,
     fontWeight: "700",
   },
   toolbarRow: {
@@ -1692,6 +1636,38 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     justifyContent: "center",
     paddingHorizontal: 8,
+  },
+  audioTimelineTrack: {
+    marginTop: 4,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#2B3D66",
+    backgroundColor: "rgba(11,19,36,0.55)",
+    padding: 8,
+    minHeight: 74,
+  },
+  audioSegmentsRow: {
+    gap: 8,
+    paddingRight: 8,
+    alignItems: "center",
+  },
+  audioTimelineEmpty: {
+    color: "#8FA2C4",
+    fontSize: 12,
+  },
+  audioSegmentBlock: {
+    width: 220,
+    borderWidth: 1,
+    borderColor: "#3D5D96",
+    borderRadius: 10,
+    backgroundColor: "rgba(22,38,68,0.75)",
+    padding: 8,
+  },
+  audioSegmentTitle: {
+    color: "#D7E4FF",
+    fontSize: 11,
+    fontWeight: "800",
+    marginBottom: 6,
   },
   audioAccordionHead: {
     marginTop: 8,
